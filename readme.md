@@ -17,7 +17,7 @@ Make sure you have the MongoDB PHP driver installed. You can find installation i
 Install the latest stable version using composer:
 
 ```
-composer require denchikby/phalcon-mongodb-odm
+composer require memmaker/phalcon-mongodb-odm
 ```
 
 or
@@ -25,7 +25,7 @@ or
 ```
 {
     "require": {
-        "denchikby/phalcon-mongodb-odm": "dev-master"
+        "memmaker/phalcon-mongodb-odm": "dev-master"
     }
 }
 ```
