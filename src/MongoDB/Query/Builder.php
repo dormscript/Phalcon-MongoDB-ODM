@@ -129,6 +129,12 @@ class Builder
         return $this;
     }
 
+    public function orderByMultiple($orderByList)
+    {
+        $this->_options['$sort'] = $orderByList;
+        return $this;
+    }
+
     public function limit($limit, $offset = null)
     {
         $this->_options['$limit'] = $limit;
