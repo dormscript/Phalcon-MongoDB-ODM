@@ -1,5 +1,5 @@
 {
-  "name": "denchikby/phalcon-mongodb-odm",
+  "name": "memmaker/phalcon-mongodb-odm",
   "description": "Phalcon MongoDB ODM",
   "keywords": ["mongodb", "mongo", "php", "odm", "orm", "phalcon"],
   "license": "MIT",
@@ -8,6 +8,11 @@
       "name": "Denis Butko",
       "email": "butko.denis.95@gmail.com",
       "homepage": "http://github.com/DenchikBY"
+    },
+    {
+      "name": "Felix Ruzzoli",
+      "email": "felix.ruzzoli@lrx-solutions.de",
+      "homepage": "http://lrx-solutions.de"
     }
   ],
   "require": {
