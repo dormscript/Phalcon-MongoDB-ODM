@@ -43,7 +43,8 @@ class Model extends \MongoDB\Collection
 
     public static function findFirst(array $params = [])
     {
-        return static::init($params)->fill(static::init()->findOne($params));
+        $result = static::init()->findOne($params);
+        return $result ? static::init((array)$result) : null;
     }
 
     public static function destroy($id)
