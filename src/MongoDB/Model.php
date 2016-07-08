@@ -75,7 +75,7 @@ class Model extends \MongoDB\Collection
         return $this->getQueryResult(parent::find($filter, $options), $fillModels);
     }
 
-    public function aggregate(array $pipeline, array $options = [], $fillModels = true)
+    public function aggregate(array $pipeline, array $options = [], $fillModels = false)
     {
         return $this->getQueryResult(parent::aggregate($pipeline, $options), $fillModels);
     }
@@ -89,7 +89,7 @@ class Model extends \MongoDB\Collection
             }
             return new Collection($collections);
         } else {
-            return $result->toArray();
+            return $result;
         }
     }
 
@@ -214,8 +214,10 @@ class Model extends \MongoDB\Collection
     protected function castArrayAttributes(array $data)
     {
         foreach ($data as $param => $value) {
-            $methodName = 'set' . Text::camelize($param);
-            $data[$param] = method_exists($this, $methodName) ? $this->{$methodName}($value) : $this->castAttribute($param, $value);
+            // NO mutators on retrieval hack
+            // $methodName = 'set' . Text::camelize($param);
+            // method_exists($this, $methodName) ? $this->{$methodName}($value) :
+            $data[$param] = $this->castAttribute($param, $value);
         }
         return $data;
     }

@@ -155,7 +155,7 @@ class Builder
      */
     public function get()
     {
-        return $this->_modelObject->aggregate($this->getQuery());
+        return $this->_modelObject->aggregate($this->getQuery(), [], true);
     }
 
     /**
