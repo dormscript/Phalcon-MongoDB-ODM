@@ -21,18 +21,18 @@ class Model extends \MongoDB\Collection
      * @param array $attributes
      * @return Model
      */
-    public static function init($attributes = [])
+    public static function init($attributes = [], $useMutators = false)
     {
         $model = (new static(Di::getDefault()->get('mongo'), static::getDbName(), static::getSource()));
         if (count($attributes) > 0) {
-            $model->fill($attributes);
+            $model->fill($attributes, $useMutators);
         }
         return $model;
     }
 
     public static function create(array $attributes)
     {
-        return static::init($attributes)->save();
+        return static::init($attributes, true)->save();
     }
 
     public static function findById($id)
@@ -98,7 +98,7 @@ class Model extends \MongoDB\Collection
         return $asString ? (string)$this->_id : $this->_id;
     }
 
-    public function fill($data)
+    public function fill($data, $useMutators = false)
     {
         $data = (array)$data;
         if (isset($data['_id'])) {
@@ -120,7 +120,7 @@ class Model extends \MongoDB\Collection
                 unset($data[$name]);
             }
         }
-        $this->_attributes = array_merge($this->_attributes, $this->castArrayAttributes($data));
+        $this->_attributes = array_merge($this->_attributes, $this->castArrayAttributes($data, $useMutators));
         return $this;
     }
 
@@ -211,13 +211,18 @@ class Model extends \MongoDB\Collection
         $this->updated_at = self::mongoTime();
     }
 
-    protected function castArrayAttributes(array $data)
+    protected function castArrayAttributes(array $data, $useMutators = false)
     {
         foreach ($data as $param => $value) {
-            // NO mutators on retrieval hack
-            // $methodName = 'set' . Text::camelize($param);
-            // method_exists($this, $methodName) ? $this->{$methodName}($value) :
-            $data[$param] = $this->castAttribute($param, $value);
+            if ($useMutators)
+            {
+                $methodName = 'set' . Text::camelize($param);
+                $data[$param] = method_exists($this, $methodName) ? $this->{$methodName}($value) : $this->castAttribute($param, $value);
+            }
+            else
+            {
+                $data[$param] = $this->castAttribute($param, $value);
+            }
         }
         return $data;
     }
