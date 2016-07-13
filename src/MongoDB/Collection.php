@@ -1,6 +1,6 @@
 <?php
 
-namespace DenchikBY\MongoDB;
+namespace MemMaker\MongoDB;
 
 use ArrayAccess;
 use Countable;
@@ -155,6 +155,7 @@ class Collection implements Iterator, ArrayAccess, Countable, JsonSerializable
 
     public function __toString()
     {
+        if (count($this->array) == 0) return '';
         if (gettype($this->array[0]) == 'object') {
             return json_encode($this->toArray());
         } else {

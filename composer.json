@@ -21,7 +21,7 @@
   },
   "autoload": {
     "psr-4": {
-      "DenchikBY\\MongoDB\\": "src/MongoDB"
+      "MemMaker\\MongoDB\\": "src/MongoDB"
     }
   },
   "minimum-stability": "stable"

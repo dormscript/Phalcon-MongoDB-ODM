@@ -1,68 +1,26 @@
 <?php
 
-namespace DenchikBY\MongoDB;
+namespace MemMaker\MongoDB;
 
-use DenchikBY\MongoDB\Query\Builder;
 use MongoDB\BSON\ObjectID;
 use MongoDB\BSON\UTCDateTime;
+use MongoDB\Collection;
 use Phalcon\Di;
+use Phalcon\Mvc\CollectionInterface;
 use Phalcon\Text;
 
-class Model extends \MongoDB\Collection
+class Model extends \MongoDB\Collection implements Di\InjectionAwareInterface
 {
 
-    protected $_id, $_attributes = [], $_relations = [];
+    protected $_id;
+    protected $_di;
+    protected $_attributes;
+    private static $collection;
 
-    protected static $casts = [], $_db;
-
-    public static $relations = [], $globalScopes = [];
-
-    /**
-     * @param array $attributes
-     * @return Model
-     */
-    public static function init($attributes = [], $useMutators = false)
+    public static function init()
     {
-        $model = (new static(Di::getDefault()->get('mongo'), static::getDbName(), static::getSource()));
-        if (count($attributes) > 0) {
-            $model->fill($attributes, $useMutators);
-        }
-        return $model;
-    }
-
-    public static function create(array $attributes)
-    {
-        return static::init($attributes, true)->save();
-    }
-
-    public static function findById($id)
-    {
-        $result = static::init()->findOne(['_id' => new ObjectID($id)]);
-        return $result ? static::init((array)$result) : null;
-    }
-
-    public static function findFirst(array $params = [])
-    {
-        $result = static::init()->findOne($params);
-        return $result ? static::init((array)$result) : null;
-    }
-
-    public static function destroy($id)
-    {
-        return static::init()->deleteOne(['_id' => new ObjectID($id)]);
-    }
-
-    public static function getSource()
-    {
-        return strtolower((new \ReflectionClass(static::class))->getShortName());
-    }
-
-    public static function getDbName()
-    {
-        if (!isset(self::$_db)) {
-            self::$_db = Di::getDefault()->get('config')->mongodb->database;
-        }
-        return self::$_db;
+        static::$collection = (new static(Di::getDefault()->get('mongo'), Di::getDefault()->getDI()->get('config')->mongodb->database, static::getSource()));
+        return static::$collection;
     }
 
     public static function mongoTime()
@@ -70,61 +28,12 @@ class Model extends \MongoDB\Collection
         return new UTCDateTime(round(microtime(true) * 1000) . '');
     }
 
-    public function find($filter = [], array $options = [], $fillModels = true)
-    {
-        return $this->getQueryResult(parent::find($filter, $options), $fillModels);
-    }
-
-    public function aggregate(array $pipeline, array $options = [], $fillModels = false)
-    {
-        return $this->getQueryResult(parent::aggregate($pipeline, $options), $fillModels);
-    }
-
-    protected function getQueryResult($result, $fillModels = true)
-    {
-        if ($fillModels) {
-            $collections = [];
-            foreach ($result as $row) {
-                $collections[] = static::init($row);
-            }
-            return new Collection($collections);
-        } else {
-            return $result;
-        }
-    }
-
     public function getId($asString = true)
     {
         return $asString ? (string)$this->_id : $this->_id;
     }
 
-    public function fill($data, $useMutators = false)
-    {
-        $data = (array)$data;
-        if (isset($data['_id'])) {
-            $this->_id = $data['_id'];
-            unset($data['_id']);
-        }
-        foreach (static::$relations as $name => $settings) {
-            if (isset($data[$name])) {
-                if ($settings[1] == 'one') {
-                    $value = $settings[0]::init($data[$name][0]);
-                    $this->setRelation($name, $value);
-                } else {
-                    $value = [];
-                    foreach ($data[$name] as $row) {
-                        $value[] = $settings[0]::init($row);
-                    }
-                    $this->setRelation($name, new Collection($value));
-                }
-                unset($data[$name]);
-            }
-        }
-        $this->_attributes = array_merge($this->_attributes, $this->castArrayAttributes($data, $useMutators));
-        return $this;
-    }
-
-    public function save(array $attributes = null)
+    public function save()
     {
         if ($attributes != null) {
             $this->fill($attributes);
@@ -213,7 +122,8 @@ class Model extends \MongoDB\Collection
 
     protected function castArrayAttributes(array $data, $useMutators = false)
     {
-        foreach ($data as $param => $value) {
+        foreach ($data as $param => $value)
+        {
             if ($useMutators)
             {
                 $methodName = 'set' . Text::camelize($param);
@@ -247,49 +157,6 @@ class Model extends \MongoDB\Collection
         return $value;
     }
 
-    public function setRelation($name, $value)
-    {
-        $this->_relations[$name] = $value;
-    }
-
-    protected function hasOne($model, $field, $localKey = null, $foreignKey = '_id')
-    {
-        if ($localKey == null) {
-            $localKey = $this->getIdFieldName($model);
-        }
-        $result = $model::init()->findFirst([$foreignKey => ($localKey == '_id' ? $this->getId(false) : $this->{$localKey})]);
-        $this->setRelation($field, $result);
-        return $result;
-    }
-
-    protected function hasMany($model, $field, $localKey = '_id', $foreignKey = null)
-    {
-        if ($foreignKey == null) {
-            $foreignKey = $this->getIdFieldName($this);
-        }
-        $result = $model::init()->find([$foreignKey => ($localKey == '_id' ? $this->getId(false) : $this->{$localKey})]);
-        $this->setRelation($field, $result);
-        return $result;
-    }
-
-    protected function loadRelation($name)
-    {
-        $settings = static::$relations[$name];
-        if ($settings[1] == 'one') {
-            return $this->hasOne($settings[0], $name, $settings[2], $settings[3]);
-        } else {
-            return $this->hasMany($settings[0], $name, $settings[2], $settings[3]);
-        }
-    }
-
-    protected function getIdFieldName($model)
-    {
-        $className = strtolower((new \ReflectionClass($model))->getShortName());
-        if (Text::endsWith($className, 's')) {
-            $className = substr($className, 0, -1);
-        }
-        return $className . '_id';
-    }
 
     public function toArray($params = [])
     {
@@ -360,20 +227,6 @@ class Model extends \MongoDB\Collection
         return $return;
     }
 
-    public static function query()
-    {
-        return new Builder(static::class);
-    }
-
-    public static function __callStatic($name, $arguments)
-    {
-        if (method_exists(static::class, 'scope' . ucfirst($name))) {
-            array_unshift($arguments, static::query());
-            return call_user_func_array([static::init(), 'scope' . ucfirst($name)], $arguments);
-        }
-        return call_user_func_array([static::query(), $name], $arguments);
-    }
-
     public function __get($name)
     {
         $methodName = 'get' . Text::camelize($name);
@@ -393,4 +246,29 @@ class Model extends \MongoDB\Collection
         return json_encode($this->toArray());
     }
 
+    /**
+     * Sets the dependency injector
+     *
+     * @param mixed $dependencyInjector
+     */
+    public function setDI(\Phalcon\DiInterface $dependencyInjector)
+    {
+        $this->_di = $dependencyInjector;
+    }
+
+    /**
+     * Returns the internal dependency injector
+     *
+     * @return \Phalcon\DiInterface
+     */
+    public function getDI()
+    {
+        return $this->_di;
+    }
+
+
+    public static function get()
+    {
+        return static::init()->find();
+    }
 }
