@@ -96,44 +96,6 @@ class Model extends \MongoDB\Collection
         return $value;
     }
 
-
-    public function toArray($params = [])
-    {
-        $attributes = array_merge(['id' => (string)$this->_id], $this->_attributes);
-        if (isset($params['include']) || isset($params['exclude'])) {
-            $attributes = array_filter($attributes, function ($value, $key) use ($params) {
-                if (isset($params['include'])) {
-                    return in_array($key, $params['include']);
-                }
-                return !in_array($key, $params['exclude']);
-            }, ARRAY_FILTER_USE_BOTH);
-        }
-        $attributes = array_map(function ($item) {
-            if (gettype($item) == 'object') {
-                if ($item instanceof ObjectID) {
-                    return (string)$item;
-                } elseif($item instanceof UTCDateTime){
-                    return $item->toDateTime()->format(DATE_ISO8601);
-                } else {
-                    return (array)$item;
-                }
-            }
-            return $item;
-        }, $attributes);
-        $relations = array_map(function ($item) {
-            if (gettype($item) == 'object') {
-                return $item->toArray();
-            } else if (gettype($item) == 'array') {
-                return array_map(function ($item1) {
-                    return $item1->toArray();
-                }, $item);
-            }
-            return $item;
-        }, $this->_relations);
-        $result = array_merge($attributes, $relations);
-        return $result;
-    }
-
     protected function event($name)
     {
         if (method_exists($this, $name)) {
@@ -354,16 +316,13 @@ class Model extends \MongoDB\Collection
 
     public static function replaceById($id, array $data)
     {
-        if (!is_a($id, 'ObjectID'))
-        {
-            $id = new ObjectID($id);
-        }
         $result = static::collection()->replaceOne(['_id' => $id], $data);
         return $result;
     }
 
     public static function create(array $data)
     {
+        $data['_id'] = (string) (new ObjectID());
         $result = static::collection()->insertOne($data);
         return $result;
     }
@@ -371,12 +330,6 @@ class Model extends \MongoDB\Collection
     public static function getById($id)
     {
         $collection = static::collection();
-
-        if (!is_a($id, 'ObjectID'))
-        {
-            $id = new ObjectID($id);
-        }
-
         $result = $collection->findOne(['_id' => $id]);
         if ($result == null)
         {
