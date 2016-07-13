@@ -11,6 +11,7 @@ use MongoDB\Model\BSONDocument;
 use Phalcon\Di;
 use Phalcon\Mvc\CollectionInterface;
 use Phalcon\Text;
+use MemMaker\MongoDB\Exceptions;
 
 class Model extends \MongoDB\Collection
 {
@@ -290,7 +291,14 @@ class Model extends \MongoDB\Collection
 
     public static function getById($id)
     {
-        return static::collection()->findOne(['_id' => $id]);
+        $collection = static::collection();
+
+        $result = $collection->findOne(['_id' => $id]);
+        if ($result == null)
+        {
+            throw new EntryNotFoundException(vsprintf("Entry with id '$1\%s' not found in collection '$2\%s'", [$id, $collection->getCollectionName()]));
+        }
+        return $result;
     }
 
     public static function deleteById($id)
