@@ -34,26 +34,6 @@ class Model extends \MongoDB\Collection
         return $asString ? (string)$this->_id : $this->_id;
     }
 
-    public function save()
-    {
-        if ($attributes != null) {
-            $this->fill($attributes);
-        }
-        $this->event('beforeSave');
-        if (isset($this->_id)) {
-            $this->event('beforeUpdate');
-            $this->updateOne(['_id' => $this->_id], ['$set' => $this->_attributes]);
-            $this->event('afterUpdate');
-        } else {
-            $this->event('beforeCreate');
-            $insertResult = $this->insertOne($this->_attributes);
-            $this->_id = $insertResult->getInsertedId();
-            $this->event('afterCreate');
-        }
-        $this->event('afterSave');
-        return $this;
-    }
-
 
     public function unsetField($field)
     {
@@ -225,90 +205,35 @@ class Model extends \MongoDB\Collection
         return $results;
     }
 
-    public static function get(array $filter = [], array $options = [])
+
+    public function beforeCreate()
     {
-        return static::collection()->find($filter, $options);
+        //$this->_id = strval(new \MongoId());
+        $this->timestamp_entry_created = new UTCDatetime(time()*1000);
+        $this->created_at = self::mongoTime();
+
+        $session = Di::getDefault()->getShared('session');
+        $username = $session->get('username');
+
+        $this->entry_created_by = $username;
     }
 
-    public function insert($entry)
+    public function beforeSave()
     {
-        return static::collection()->insertOne($entry);
+        $this->timestamp_entry_last_modified = new UTCDatetime(time()*1000);
+
+        $session = Di::getDefault()->getShared('session');
+        $username = $session->get('username');
+
+        $this->entry_last_modified_by = $username;
+
+        $this->changedFields = array();
     }
 
-
-    public function update(array $attributes)
+    public function beforeUpdate()
     {
-        $this->event('beforeSave');
-        $this->event('beforeUpdate');
-        $this->fill($attributes);
-        static::collection()->updateOne(['_id' => $this->_id], ['$set' => $attributes]);
-        $this->event('afterUpdate');
-        $this->event('afterSave');
-        return $this;
-    }
 
-    public function increment($argument, $value = 1)
-    {
-        $this->{$argument} += $value;
-        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
-        return $this;
-    }
-
-    public function decrement($argument, $value = 1)
-    {
-        $this->{$argument} -= $value;
-        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
-        return $this;
-    }
-
-    public function delete()
-    {
-        $this->event('beforeDelete');
-        $this->deleteOne(['_id' => $this->getId(false)]);
-        $this->event('afterDelete');
-        return $this;
-    }
-
-
-    /* this saves the entry contained in $inputdata to the database using
-   /* the collection described in $classname.
-   /* If $inputdata contains an 'id' field of type MongoId the entry gets
-   /* updated instead of inserted. */
-    public function addOrUpdateEntry($inputdata, $modelname)
-    {
-        $classname = $this->resolveModelName($modelname);
-        if (isset($inputdata['id']) && strlen($inputdata['id']) == 24 && ctype_xdigit($inputdata['id'])) { // TODO: fix this condition, added check for correct length and hexadeci-value. No verification from mongodb driver anymore
-            $entry = $classname::findById($inputdata['id']);
-        } else {
-            $entry = $classname::init();
-        }
-        $entry->assign($inputdata); // only update defined fields, leave others
-
-        $success = $entry->save();
-
-        return $success;
-    }
-
-    public static function getById($id)
-    {
-        $collection = static::collection();
-
-        if (!is_a($id, 'ObjectID'))
-        {
-            $id = new ObjectID($id);
-        }
-
-        $result = $collection->findOne(['_id' => $id]);
-        if ($result == null)
-        {
-            throw new EntryNotFoundException(vsprintf("Entry with id '$1\%s' not found in collection '$2\%s'", [$id, $collection->getCollectionName()]));
-        }
-        return $result;
-    }
-
-    public static function deleteById($id)
-    {
-        return static::collection()->deleteOne(['_id' => $id]);
+        $this->updated_at = self::mongoTime();
     }
 
     public static function getFullTextSearchQuery($model, $searchString, $searchLimit = 500)
@@ -362,34 +287,108 @@ class Model extends \MongoDB\Collection
         }
     }
 
-    public function beforeCreate()
+
+    public function increment($argument, $value = 1)
     {
-        //$this->_id = strval(new \MongoId());
-        $this->timestamp_entry_created = new UTCDatetime(time()*1000);
-        $this->created_at = self::mongoTime();
-
-        $session = Di::getDefault()->getShared('session');
-        $username = $session->get('username');
-
-        $this->entry_created_by = $username;
+        $this->{$argument} += $value;
+        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
+        return $this;
     }
 
-    public function beforeSave()
+    public function decrement($argument, $value = 1)
     {
-        $this->timestamp_entry_last_modified = new UTCDatetime(time()*1000);
-
-        $session = Di::getDefault()->getShared('session');
-        $username = $session->get('username');
-
-        $this->entry_last_modified_by = $username;
-
-        $this->changedFields = array();
+        $this->{$argument} -= $value;
+        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
+        return $this;
     }
 
-    public function beforeUpdate()
+    public function save()
     {
-
-        $this->updated_at = self::mongoTime();
+        if ($attributes != null) {
+            $this->fill($attributes);
+        }
+        $this->event('beforeSave');
+        if (isset($this->_id)) {
+            $this->event('beforeUpdate');
+            $this->updateOne(['_id' => $this->_id], ['$set' => $this->_attributes]);
+            $this->event('afterUpdate');
+        } else {
+            $this->event('beforeCreate');
+            $insertResult = $this->insertOne($this->_attributes);
+            $this->_id = $insertResult->getInsertedId();
+            $this->event('afterCreate');
+        }
+        $this->event('afterSave');
+        return $this;
     }
+
+    public static function get(array $filter = [], array $options = [])
+    {
+        return static::collection()->find($filter, $options);
+    }
+
+    public function insert($entry)
+    {
+        return static::collection()->insertOne($entry);
+    }
+
+    public function delete()
+    {
+        $this->event('beforeDelete');
+        $this->deleteOne(['_id' => $this->getId(false)]);
+        $this->event('afterDelete');
+        return $this;
+    }
+
+
+    public function update(array $attributes)
+    {
+        $this->event('beforeSave');
+        $this->event('beforeUpdate');
+        $this->fill($attributes);
+        static::collection()->updateOne(['_id' => $this->_id], ['$set' => $attributes]);
+        $this->event('afterUpdate');
+        $this->event('afterSave');
+        return $this;
+    }
+
+    public static function replaceById($id, array $data)
+    {
+        if (!is_a($id, 'ObjectID'))
+        {
+            $id = new ObjectID($id);
+        }
+        $result = static::collection()->replaceOne(['_id' => $id], $data);
+        return $result;
+    }
+
+    public static function create(array $data)
+    {
+        $result = static::collection()->insertOne($data);
+        return $result;
+    }
+
+    public static function getById($id)
+    {
+        $collection = static::collection();
+
+        if (!is_a($id, 'ObjectID'))
+        {
+            $id = new ObjectID($id);
+        }
+
+        $result = $collection->findOne(['_id' => $id]);
+        if ($result == null)
+        {
+            throw new EntryNotFoundException(vsprintf("Entry with id '$1\%s' not found in collection '$2\%s'", [$id, $collection->getCollectionName()]));
+        }
+        return $result;
+    }
+
+    public static function deleteById($id)
+    {
+        return static::collection()->deleteOne(['_id' => $id]);
+    }
+
 
 }
