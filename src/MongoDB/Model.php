@@ -19,7 +19,7 @@ class Model extends \MongoDB\Collection
     protected $_id;
     protected $_attributes;
 
-    protected static function collection()
+    public static function collection()
     {
         return (new static(Di::getDefault()->get('mongo'), Di::getDefault()->get('config')->mongodb->database, static::getSource()));
     }
