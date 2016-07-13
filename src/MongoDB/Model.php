@@ -9,17 +9,18 @@ use Phalcon\Di;
 use Phalcon\Mvc\CollectionInterface;
 use Phalcon\Text;
 
-class Model extends \MongoDB\Collection implements Di\InjectionAwareInterface
+class Model extends \MongoDB\Collection
 {
 
     protected $_id;
-    protected $_di;
     protected $_attributes;
-    private static $collection;
+    protected static $collection = null;
 
-    public static function init()
+    protected static function collection()
     {
-        static::$collection = (new static(Di::getDefault()->get('mongo'), Di::getDefault()->getDI()->get('config')->mongodb->database, static::getSource()));
+        if (static::$collection == null) {
+            static::$collection = (new static(Di::getDefault()->get('mongo'), Di::getDefault()->get('config')->mongodb->database, static::getSource()));
+        }
         return static::$collection;
     }
 
@@ -53,38 +54,6 @@ class Model extends \MongoDB\Collection implements Di\InjectionAwareInterface
         return $this;
     }
 
-    public function update(array $attributes)
-    {
-        $this->event('beforeSave');
-        $this->event('beforeUpdate');
-        $this->fill($attributes);
-        $this->updateOne(['_id' => $this->_id], ['$set' => $attributes]);
-        $this->event('afterUpdate');
-        $this->event('afterSave');
-        return $this;
-    }
-
-    public function increment($argument, $value = 1)
-    {
-        $this->{$argument} += $value;
-        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
-        return $this;
-    }
-
-    public function decrement($argument, $value = 1)
-    {
-        $this->{$argument} -= $value;
-        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
-        return $this;
-    }
-
-    public function delete()
-    {
-        $this->event('beforeDelete');
-        $this->deleteOne(['_id' => $this->getId(false)]);
-        $this->event('afterDelete');
-        return $this;
-    }
 
     public function unsetField($field)
     {
@@ -108,16 +77,6 @@ class Model extends \MongoDB\Collection implements Di\InjectionAwareInterface
             return true;
         }
         return false;
-    }
-
-    public function beforeCreate()
-    {
-        $this->created_at = self::mongoTime();
-    }
-
-    public function beforeUpdate()
-    {
-        $this->updated_at = self::mongoTime();
     }
 
     protected function castArrayAttributes(array $data, $useMutators = false)
@@ -246,29 +205,194 @@ class Model extends \MongoDB\Collection implements Di\InjectionAwareInterface
         return json_encode($this->toArray());
     }
 
-    /**
-     * Sets the dependency injector
-     *
-     * @param mixed $dependencyInjector
-     */
-    public function setDI(\Phalcon\DiInterface $dependencyInjector)
-    {
-        $this->_di = $dependencyInjector;
-    }
-
-    /**
-     * Returns the internal dependency injector
-     *
-     * @return \Phalcon\DiInterface
-     */
-    public function getDI()
-    {
-        return $this->_di;
-    }
-
-
     public static function get()
     {
-        return static::init()->find();
+        return static::collection()->find();
     }
+
+    public function insert($entry)
+    {
+        return static::collection()->insertOne($entry);
+    }
+
+
+    public function update(array $attributes)
+    {
+        $this->event('beforeSave');
+        $this->event('beforeUpdate');
+        $this->fill($attributes);
+        static::collection()->updateOne(['_id' => $this->_id], ['$set' => $attributes]);
+        $this->event('afterUpdate');
+        $this->event('afterSave');
+        return $this;
+    }
+
+    public function increment($argument, $value = 1)
+    {
+        $this->{$argument} += $value;
+        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
+        return $this;
+    }
+
+    public function decrement($argument, $value = 1)
+    {
+        $this->{$argument} -= $value;
+        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
+        return $this;
+    }
+
+    public function delete()
+    {
+        $this->event('beforeDelete');
+        $this->deleteOne(['_id' => $this->getId(false)]);
+        $this->event('afterDelete');
+        return $this;
+    }
+
+
+    /* this saves the entry contained in $inputdata to the database using
+   /* the collection described in $classname.
+   /* If $inputdata contains an 'id' field of type MongoId the entry gets
+   /* updated instead of inserted. */
+    public function addOrUpdateEntry($inputdata, $modelname)
+    {
+        $classname = $this->resolveModelName($modelname);
+        if (isset($inputdata['id']) && strlen($inputdata['id']) == 24 && ctype_xdigit($inputdata['id'])) { // TODO: fix this condition, added check for correct length and hexadeci-value. No verification from mongodb driver anymore
+            $entry = $classname::findById($inputdata['id']);
+        } else {
+            $entry = $classname::init();
+        }
+        $entry->assign($inputdata); // only update defined fields, leave others
+
+        $success = $entry->save();
+
+        return $success;
+    }
+
+
+    public function createEntry($modelname)
+    {
+        $classname = $this->resolveModelName($modelname);
+        return $classname::init();
+    }
+
+    public function getEntryByModelAndId($modelname, $id)
+    {
+        $classname = $this->resolveModelName($modelname);
+        return $classname::findById($id);
+    }
+
+    public function getEntryByModelAndIdWithRelationship($modelname, $id, $relationship)
+    {
+        $classname = $this->resolveModelName($modelname);
+        return $classname::where('_id', '=', $id)->join($relationship)->get();
+    }
+
+    public function deleteEntryByModelAndId($modelname, $id)
+    {
+        $classname = $this->resolveModelName($modelname);
+        return $classname::findById($id)->delete();
+    }
+
+    public function getEntriesByModel($modelname)
+    {
+        $classname = $this->resolveModelName($modelname);
+        $entries = $classname::get();
+        return $entries;
+    }
+
+    public function getEntriesByModelPaginated($modelname, $pagination, $sortFieldOrder)
+    {
+        $classname = $this->resolveModelName($modelname);
+        $builder = $classname::query()->limit($pagination['limit'], $pagination['skip']);
+
+        if ($sortFieldOrder->getCount() > 0)
+            $builder = $builder->orderByMultiple($sortFieldOrder);
+
+        $entries = $builder->get();
+
+        return $entries;
+    }
+
+    public static function getFullTextSearchQuery($model, $searchString, $searchLimit = 500)
+    {
+        $searchFields = array();
+        foreach ($model['searchFields'] as $fieldname) {
+            $searchFields[] = array($fieldname => new \MongoRegex('/' . $searchString . '/iu'));
+        }
+        return
+            array(
+                array('$or' => $searchFields),
+                'sort' => $model['sortFieldOrder'],
+                'limit' => $searchLimit
+            );
+    }
+
+    /* Assigns all fields it can find in $data to the $this model object.
+    /* Tries to parse everything correct according to fieldtype.  */
+    public function assign($data)
+    {
+        $modelclassname = get_class($this);
+        $model = $modelclassname::getModel();
+
+        foreach ($model['fields'] as $fieldname => $fieldFlags)
+        {
+            if (!array_key_exists($fieldname, $data))
+            {
+                // no value for this fieldtype
+                continue;
+            }
+
+            $fieldtype = $fieldFlags['type'];
+
+            $this->$fieldname = array_key_exists('default', $fieldFlags) ? $fieldFlags['default'] : '';
+
+            $valueConverter = Di::getDefault()->getShared('valueConverter');
+
+            $convertedValue = $valueConverter->getConversion($data[$fieldname], $fieldtype);
+
+            $this->setField($fieldname, $convertedValue);
+        }
+    }
+
+    public function setField($fieldname, $value)
+    {
+        if ($this->$fieldname !== $value && (! in_array($fieldname, $this->changedFields)))
+        {
+            // only add to changedFields if the value changed and the field is not already in there
+            $this->changedFields[] = $fieldname;
+            $this->$fieldname = $value;
+        }
+    }
+
+    public function beforeCreate()
+    {
+        //$this->_id = strval(new \MongoId());
+        $this->timestamp_entry_created = new UTCDatetime(time()*1000);
+        $this->created_at = self::mongoTime();
+
+        $session = Di::getDefault()->getShared('session');
+        $username = $session->get('username');
+
+        $this->entry_created_by = $username;
+    }
+
+    public function beforeSave()
+    {
+        $this->timestamp_entry_last_modified = new UTCDatetime(time()*1000);
+
+        $session = Di::getDefault()->getShared('session');
+        $username = $session->get('username');
+
+        $this->entry_last_modified_by = $username;
+
+        $this->changedFields = array();
+    }
+
+    public function beforeUpdate()
+    {
+
+        $this->updated_at = self::mongoTime();
+    }
+
 }
