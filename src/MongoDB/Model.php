@@ -2,9 +2,12 @@
 
 namespace MemMaker\MongoDB;
 
+use MongoDB\Driver\Command;
+use MongoDB\BSON\Javascript;
 use MongoDB\BSON\ObjectID;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Collection;
+use MongoDB\Model\BSONDocument;
 use Phalcon\Di;
 use Phalcon\Mvc\CollectionInterface;
 use Phalcon\Text;
@@ -22,6 +25,7 @@ class Model extends \MongoDB\Collection
             static::$collection = (new static(Di::getDefault()->get('mongo'), Di::getDefault()->get('config')->mongodb->database, static::getSource()));
         }
         return static::$collection;
+
     }
 
     public static function mongoTime()
@@ -205,9 +209,29 @@ class Model extends \MongoDB\Collection
         return json_encode($this->toArray());
     }
 
-    public static function get()
+    public static function mapReduce($mapJS, $reduceJS, array $query = array())
     {
-        return static::collection()->find();
+        $map = new Javascript($mapJS);
+        $reduce = new Javascript($reduceJS);
+
+        $source = static::getSource();
+        $command = new Command([
+            "mapreduce" => $source,
+            "map" => $map,
+            "reduce" => $reduce,
+            "query" => new \stdClass(), //new BSONDocument($query),
+            "out" => 'results'
+        ]);
+
+        $manager = Di::getDefault()->get('mongo');
+        $results = $manager->executeCommand('TheBackend', $command);
+
+        return $results;
+    }
+
+    public static function get(array $filter = [], array $options = [])
+    {
+        return static::collection()->find($filter, $options);
     }
 
     public function insert($entry)
