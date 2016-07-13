@@ -17,15 +17,10 @@ class Model extends \MongoDB\Collection
 
     protected $_id;
     protected $_attributes;
-    protected static $collection = null;
 
     protected static function collection()
     {
-        if (static::$collection == null) {
-            static::$collection = (new static(Di::getDefault()->get('mongo'), Di::getDefault()->get('config')->mongodb->database, static::getSource()));
-        }
-        return static::$collection;
-
+        return (new static(Di::getDefault()->get('mongo'), Di::getDefault()->get('config')->mongodb->database, static::getSource()));
     }
 
     public static function mongoTime()
@@ -293,49 +288,14 @@ class Model extends \MongoDB\Collection
         return $success;
     }
 
-
-    public function createEntry($modelname)
+    public static function getById($id)
     {
-        $classname = $this->resolveModelName($modelname);
-        return $classname::init();
+        return static::collection()->findOne(['_id' => $id]);
     }
 
-    public function getEntryByModelAndId($modelname, $id)
+    public static function deleteById($id)
     {
-        $classname = $this->resolveModelName($modelname);
-        return $classname::findById($id);
-    }
-
-    public function getEntryByModelAndIdWithRelationship($modelname, $id, $relationship)
-    {
-        $classname = $this->resolveModelName($modelname);
-        return $classname::where('_id', '=', $id)->join($relationship)->get();
-    }
-
-    public function deleteEntryByModelAndId($modelname, $id)
-    {
-        $classname = $this->resolveModelName($modelname);
-        return $classname::findById($id)->delete();
-    }
-
-    public function getEntriesByModel($modelname)
-    {
-        $classname = $this->resolveModelName($modelname);
-        $entries = $classname::get();
-        return $entries;
-    }
-
-    public function getEntriesByModelPaginated($modelname, $pagination, $sortFieldOrder)
-    {
-        $classname = $this->resolveModelName($modelname);
-        $builder = $classname::query()->limit($pagination['limit'], $pagination['skip']);
-
-        if ($sortFieldOrder->getCount() > 0)
-            $builder = $builder->orderByMultiple($sortFieldOrder);
-
-        $entries = $builder->get();
-
-        return $entries;
+        return static::collection()->deleteOne(['_id' => $id]);
     }
 
     public static function getFullTextSearchQuery($model, $searchString, $searchLimit = 500)
