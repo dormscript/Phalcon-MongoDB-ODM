@@ -293,6 +293,11 @@ class Model extends \MongoDB\Collection
     {
         $collection = static::collection();
 
+        if (!is_a($id, 'ObjectID'))
+        {
+            $id = new ObjectID($id);
+        }
+
         $result = $collection->findOne(['_id' => $id]);
         if ($result == null)
         {
