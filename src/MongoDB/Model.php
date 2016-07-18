@@ -289,6 +289,33 @@ class Model extends \MongoDB\Collection
         return static::collection()->find($filter, $options);
     }
 
+    public static function getWithReferences(array $filter = [])
+    {
+        $modelObject = static::collection();
+        $relations = $modelObject->getRelations();
+        $pipeline = [self::getMatchPipeline($filter)];
+        foreach ($relations as $relation)
+        {
+            $pipeline[] = self::getLookUpPipeline($relation['localFieldname'], $relation['refCollectionName'], $relation['asLocalFieldname']);
+        }
+        return $modelObject->aggregate($pipeline);
+    }
+
+    private static function getMatchPipeline($query)
+    {
+        return ['$match' => $query];
+    }
+
+    private static function getLookUpPipeline($localFieldname, $refCollectionName, $asLocalFieldname)
+    {
+        return ['$lookup' => [
+            'from' => $refCollectionName,
+            'localField' => $localFieldname,
+            'foreignField' => "_id",
+            'as' => $asLocalFieldname
+        ]];
+    }
+
     public function insert($entry)
     {
         return static::collection()->insertOne($entry);
