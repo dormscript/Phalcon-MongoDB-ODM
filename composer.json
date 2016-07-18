@@ -21,7 +21,8 @@
   },
   "autoload": {
     "psr-4": {
-      "MemMaker\\MongoDB\\": "src/MongoDB"
+      "MemMaker\\MongoDB\\": "src/MongoDB",
+      "MemMaker\\MongoDB\\Exceptions\\": "src/MongoDB/Exceptions"
     }
   },
   "minimum-stability": "stable"
