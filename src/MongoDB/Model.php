@@ -11,7 +11,10 @@ use MongoDB\Model\BSONDocument;
 use Phalcon\Di;
 use Phalcon\Mvc\CollectionInterface;
 use Phalcon\Text;
-use MemMaker\MongoDB\Exceptions;
+
+// autoloading would not work for me, TODO: make it work
+require_once 'Exceptions/EntryNotFoundException.php';
+require_once 'Exceptions/ErrorOnInsertException.php';
 
 class Model extends \MongoDB\Collection
 {
@@ -289,24 +292,12 @@ class Model extends \MongoDB\Collection
         return static::collection()->find($filter, $options);
     }
 
-    public static function getWithReferences(array $filter = [])
-    {
-        $modelObject = static::collection();
-        $relations = $modelObject->getRelations();
-        $pipeline = [self::getMatchPipeline($filter)];
-        foreach ($relations as $relation)
-        {
-            $pipeline[] = self::getLookUpPipeline($relation['localFieldname'], $relation['refCollectionName'], $relation['asLocalFieldname']);
-        }
-        return $modelObject->aggregate($pipeline);
-    }
-
-    private static function getMatchPipeline($query)
+    protected static function getMatchPipeline($query)
     {
         return ['$match' => $query];
     }
 
-    private static function getLookUpPipeline($localFieldname, $refCollectionName, $asLocalFieldname)
+    protected static function getLookUpPipeline($localFieldname, $refCollectionName, $asLocalFieldname)
     {
         return ['$lookup' => [
             'from' => $refCollectionName,
@@ -360,7 +351,7 @@ class Model extends \MongoDB\Collection
         $result = $collection->findOne(['_id' => $id]);
         if ($result == null)
         {
-            throw new EntryNotFoundException(vsprintf("Entry with id '$1\%s' not found in collection '$2\%s'", [$id, $collection->getCollectionName()]));
+            throw new \MemMaker\MongoDB\Exceptions\EntryNotFoundException(vsprintf("Entry with id '%1\$s' not found in collection '%2\$s'", [$id, $collection->getCollectionName()]));
         }
         return $result;
     }
