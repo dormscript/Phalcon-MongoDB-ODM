@@ -3,6 +3,7 @@
 namespace MemMaker\MongoDB;
 
 use MongoDB\Driver\Command;
+use MongoDB\Database;
 use MongoDB\BSON\Javascript;
 use MongoDB\BSON\ObjectID;
 use MongoDB\BSON\UTCDateTime;
@@ -37,6 +38,13 @@ class Model extends \MongoDB\Collection
         return $asString ? (string)$this->_id : $this->_id;
     }
 
+    public static function destroyDatabase()
+    {
+        $dbname = Di::getDefault()->get('config')->mongodb->database;
+        $manager = Di::getDefault()->get('mongo');
+        $db = new Database($manager, $dbname);
+        $db->drop();
+    }
 
     public function unsetField($field)
     {
