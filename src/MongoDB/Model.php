@@ -25,7 +25,13 @@ class Model extends \MongoDB\Collection
 
     public static function collection()
     {
-        return (new static(Di::getDefault()->get('mongo'), Di::getDefault()->get('config')->mongodb->database, static::getSource()));
+        $client = Di::getDefault()->getShared('dispatcher')->getParam('client');
+        $database = Di::getDefault()->get('config')->mongodb->database;
+        if ($client != 'Master')
+        {
+            $database = $client;
+        }
+        return (new static(Di::getDefault()->get('mongo'), $database, static::getSource()));
     }
 
     public static function mongoTime()
