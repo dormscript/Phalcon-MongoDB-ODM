@@ -1,4 +1,5 @@
 <?php
+declare(strict_types = 1);  // MUAHAHAHAHAHAHAHHHH!!!!! finally..
 
 namespace MemMaker\MongoDB;
 
@@ -23,15 +24,20 @@ class Model extends \MongoDB\Collection
     protected $_id;
     protected $_attributes;
 
-    public static function collection()
+    public static function collection($collectionName = '')
     {
         $client = Di::getDefault()->getShared('dispatcher')->getParam('client');
-        $database = Di::getDefault()->get('config')->mongodb->database;
+        $config = Di::getDefault()->getShared('config');
+        $dbname = $config->mongodb->database;
         if ($client != 'Master')
         {
-            $database = $client;
+            $dbname = $client;
         }
-        return (new static(Di::getDefault()->get('mongo'), $database, static::getSource()));
+        if ($collectionName == '')
+        {
+            $collectionName = static::getSource();
+        }
+        return (new static(Di::getDefault()->getShared('mongo'), $dbname, $collectionName));
     }
 
     public static function mongoTime()
@@ -301,9 +307,9 @@ class Model extends \MongoDB\Collection
         return $this;
     }
 
-    public static function get(array $filter = [], array $options = [])
+    public static function get(string $model = '', array $filter = [], array $options = [])
     {
-        return static::collection()->find($filter, $options);
+        return static::collection($model)->find($filter, $options);
     }
 
     protected static function getMatchPipeline($query)
