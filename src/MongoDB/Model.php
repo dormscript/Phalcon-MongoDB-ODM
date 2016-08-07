@@ -102,8 +102,12 @@ class Model extends \MongoDB\Collection
 
     public static function create(array $data)
     {
+        $hooks = Di::getDefault()->getShared('hooks');
+
         $data['_id'] = (string) (new ObjectID());
+        $hooks->beforeCreate($data);
         $result = static::collection()->insertOne($data);
+        $hooks->afterCreate($result);
         return $result;
     }
 
@@ -212,14 +216,16 @@ class Model extends \MongoDB\Collection
             );
     }
 
-    public static function getWithReferences(string $model, array $filter = [], array $options = [])
+    public static function getWithReferences(array $model, array $filter = [], array $options = [])
     {
-        $modelObject = static::collection($model);
-        if (!$modelObject->hasRelations($model))
+        $modelName = $model['name'];
+
+        $collection = static::collection($modelName);
+        if (!$collection->hasRelations($model))
         {
-            return self::getByModel($model, $filter, $options);
+            return self::getByModel($modelName, $filter, $options);
         }
-        $relations = $modelObject->getRelations();
+        $relations = $collection->getRelations($model);
         $pipeline = [];
         if (count($filter) > 0)
         {
@@ -230,7 +236,7 @@ class Model extends \MongoDB\Collection
         {
             $pipeline[] = static::getLookUpPipeline($relation['name'], $relation['referencedModel'], 'local_'.$relation['name']);
         }
-        return $modelObject->aggregate($pipeline);
+        return $collection->aggregate($pipeline);
     }
 
     protected static function getMatchPipeline($query)
@@ -349,13 +355,6 @@ class Model extends \MongoDB\Collection
     }
 
     //////// Events
-
-    protected function event($name)
-    {
-        if (method_exists($this, $name)) {
-            $this->{$name}();
-        }
-    }
 
     public function beforeCreate()
     {
