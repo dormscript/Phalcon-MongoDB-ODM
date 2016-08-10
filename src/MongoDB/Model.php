@@ -31,7 +31,7 @@ class Model extends \MongoDB\Collection
         $client = Di::getDefault()->getShared('dispatcher')->getParam('client');
         $config = Di::getDefault()->getShared('config');
         $dbname = $config->mongodb->database;
-        if ($client != 'Master')
+        if (!in_array($client, ['Master', '']))
         {
             $dbname = $client;
         }
@@ -122,7 +122,7 @@ class Model extends \MongoDB\Collection
         return $result;
     }
 
-    public static function replaceById($id, array $data)
+    public static function replaceById(string $id, array $data)
     {
         $result = static::collection()->replaceOne(['_id' => $id], $data);
         return $result;
