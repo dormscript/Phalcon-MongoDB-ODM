@@ -140,6 +140,11 @@ class Model extends \MongoDB\Collection
         return static::collection($model)->find($filter, $options);
     }
 
+    public static function getOneByModel(string $model, array $filter = [], array $options = [])
+    {
+        return static::collection($model)->findOne($filter, $options);
+    }
+
     public static function createForModel(string $modelName, array $entry = [])
     {
         $entry['_id'] = (string) (new ObjectID());
@@ -259,6 +264,26 @@ class Model extends \MongoDB\Collection
         $manager = Di::getDefault()->get('mongo');
         $db = new Database($manager, $dbname);
         $db->drop();
+    }
+
+    public static function createIndicesOnFields(string $modelName, array $fieldNames)
+    {
+        $keys = [];
+        foreach ($fieldNames as $fieldName)
+        {
+            $keys[] = ['key' => [$fieldName => 1]];
+        }
+        static::collection($modelName)->createIndex($keys);
+    }
+
+    public static function createUniqueIndicesOnFields(string $modelName, array $fieldNames)
+    {
+        $keys = [];
+        foreach ($fieldNames as $fieldName)
+        {
+            $keys[] = ['key' => [$fieldName => 1], 'unique' => true];
+        }
+        static::collection($modelName)->createIndex($keys);
     }
 
 
