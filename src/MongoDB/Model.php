@@ -254,9 +254,8 @@ class Model extends \MongoDB\Collection
         ]];
     }
 
-    public static function destroyDatabase()
+    public static function destroyDatabase(string $dbname)
     {
-        $dbname = Di::getDefault()->get('config')->mongodb->database;
         $manager = Di::getDefault()->get('mongo');
         $db = new Database($manager, $dbname);
         $db->drop();
