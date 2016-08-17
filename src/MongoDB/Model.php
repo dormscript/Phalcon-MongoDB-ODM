@@ -26,18 +26,20 @@ class Model extends \MongoDB\Collection
 
     ////// Bootstrapping
 
-    public static function collection($collectionName = '')
+    public static function collection(array $path)
     {
-        $client = Di::getDefault()->getShared('dispatcher')->getParam('client');
         $config = Di::getDefault()->getShared('config');
-        $dbname = $config->mongodb->database;
-        if (!in_array($client, ['Master', '']))
+        $client = $path[0];
+        if ($client == 'Master')
         {
-            $dbname = $client;
+            $dbname = $config->mongodb->database;
+            $collectionName = $path[1];
         }
-        if ($collectionName == '')
+        else
         {
-            $collectionName = static::getSource();
+            $spaceId = $path[1];
+            $collectionName = $path[2];
+            $dbname = $client . '_' . $spaceId;
         }
         return (new static(Di::getDefault()->getShared('mongo'), $dbname, $collectionName));
     }
@@ -95,18 +97,13 @@ class Model extends \MongoDB\Collection
     /// NOTES:
     // using static::collectin() means the the Model and thereby the Collection is chosen implicitly based upon the Classname used in the call
 
-    public static function get(array $filter = [], array $options = [])
-    {
-        return static::collection()->find($filter, $options);
-    }
-
-    public static function create(array $data)
+    public function create(array $data)
     {
         $hooks = Di::getDefault()->getShared('hooks');
 
         $data['_id'] = (string) (new ObjectID());
         $hooks->beforeCreate($data);
-        $result = static::collection()->insertOne($data);
+        $result = $this->insertOne($data);
         $hooks->afterCreate($result);
         return $result;
     }
@@ -122,9 +119,9 @@ class Model extends \MongoDB\Collection
         return $result;
     }
 
-    public static function replaceById(string $id, array $data)
+    public function replaceById(string $id, array $data)
     {
-        $result = static::collection()->replaceOne(['_id' => $id], $data);
+        $result = $this->replaceOne(['_id' => $id], $data);
         return $result;
     }
 
@@ -132,44 +129,6 @@ class Model extends \MongoDB\Collection
     {
         return static::collection()->deleteOne(['_id' => $id]);
     }
-
-    ///// Explicit Model Methods (needed for Entries Class)
-
-    public static function getByModel(string $model, array $filter = [], array $options = [])
-    {
-        return static::collection($model)->find($filter, $options);
-    }
-
-    public static function getOneByModel(string $model, array $filter = [], array $options = [])
-    {
-        return static::collection($model)->findOne($filter, $options);
-    }
-
-    public static function createForModel(string $modelName, array $entry = [])
-    {
-        $entry['_id'] = (string) (new ObjectID());
-        $modelObject = static::collection($modelName);
-        $modelObject->insertOne($entry);
-    }
-
-    public static function getByModelAndId(string $modelName, string $entryid)
-    {
-        $modelObject = static::collection($modelName);
-        return $modelObject->findOne(['_id' => $entryid]);
-    }
-
-    public static function replaceByModelId(string $modelName, string $entryid, array $inputdata)
-    {
-        $modelObject = static::collection($modelName);
-        return $modelObject->replaceOne(['_id' => $entryid], $inputdata);
-    }
-
-    public static function deleteByModelId(string $modelName, string $entryid)
-    {
-        $modelObject = static::collection($modelName);
-        return $modelObject->deleteOne(['_id' => $entryid]);
-    }
-
 
     ////// Advanced
 
@@ -221,14 +180,12 @@ class Model extends \MongoDB\Collection
             );
     }
 
-    public static function getWithReferences(array $model, array $filter = [], array $options = [])
+    public static function getWithReferences(array $path, array $model, array $filter = [], array $options = [])
     {
-        $modelName = $model['name'];
-
-        $collection = static::collection($modelName);
+        $collection = static::collection($path);
         if (!$collection->hasRelations($model))
         {
-            return self::getByModel($modelName, $filter, $options);
+            return $collection->find($filter, $options);
         }
         $relations = $collection->getRelations($model);
         $pipeline = [];
