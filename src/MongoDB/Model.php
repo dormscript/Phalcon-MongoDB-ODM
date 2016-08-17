@@ -108,10 +108,9 @@ class Model extends \MongoDB\Collection
         return $result;
     }
 
-    public static function getById($id)
+    public function getById($id)
     {
-        $collection = static::collection();
-        $result = $collection->findOne(['_id' => $id]);
+        $result = $this->findOne(['_id' => $id]);
         if ($result == null)
         {
             throw new \MemMaker\MongoDB\Exceptions\EntryNotFoundException(vsprintf("Entry with id '%1\$s' not found in collection '%2\$s'", [$id, $collection->getCollectionName()]));
@@ -125,9 +124,9 @@ class Model extends \MongoDB\Collection
         return $result;
     }
 
-    public static function deleteById($id)
+    public function deleteById($id)
     {
-        return static::collection()->deleteOne(['_id' => $id]);
+        return $this->deleteOne(['_id' => $id]);
     }
 
     ////// Advanced
