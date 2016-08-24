@@ -3,6 +3,7 @@ declare(strict_types = 1);  // MUAHAHAHAHAHAHAHHHH!!!!! finally..
 
 namespace MemMaker\MongoDB;
 
+use Master\TheBackend\Models\Entries;
 use MongoDB\Driver\Command;
 use MongoDB\Database;
 use MongoDB\BSON\Javascript;
@@ -41,7 +42,7 @@ class Model extends \MongoDB\Collection
             $collectionName = $path[2];
             $dbname = $client . '_' . $spaceId;
         }
-        return (new static(Di::getDefault()->getShared('mongo'), $dbname, $collectionName));
+        return (new static(Di::getDefault()->getShared('mongo'), $dbname, $collectionName,['typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array']]));
     }
 
 
@@ -177,42 +178,6 @@ class Model extends \MongoDB\Collection
                 'sort' => $model['sortFieldOrder'],
                 'limit' => $searchLimit
             );
-    }
-
-    public static function getWithReferences(array $path, array $model, array $filter = [], array $options = [])
-    {
-        $collection = static::collection($path);
-        if (!$collection->hasRelations($model))
-        {
-            return $collection->find($filter, $options);
-        }
-        $relations = $collection->getRelations($model);
-        $pipeline = [];
-        if (count($filter) > 0)
-        {
-            $pipeline[] = static::getMatchPipeline($filter);
-        }
-
-        foreach ($relations as $relation)
-        {
-            $pipeline[] = static::getLookUpPipeline($relation['name'], $relation['referencedModel'], 'local_'.$relation['name']);
-        }
-        return $collection->aggregate($pipeline);
-    }
-
-    protected static function getMatchPipeline($query)
-    {
-        return ['$match' => $query];
-    }
-
-    protected static function getLookUpPipeline($localFieldname, $refCollectionName, $asLocalFieldname)
-    {
-        return ['$lookup' => [
-            'from' => $refCollectionName,
-            'localField' => $localFieldname,
-            'foreignField' => "_id",
-            'as' => $asLocalFieldname
-        ]];
     }
 
     public static function destroyDatabase(string $dbname)
