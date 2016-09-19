@@ -10,6 +10,7 @@ use MongoDB\BSON\Javascript;
 use MongoDB\BSON\ObjectID;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Collection;
+use MongoDB\Driver\Manager;
 use MongoDB\Model\BSONDocument;
 use Phalcon\Di;
 use Phalcon\Mvc\CollectionInterface;
@@ -24,27 +25,34 @@ class Model extends \MongoDB\Collection
 
     protected $_id;
     protected $_attributes;
+    private $modelName;
+    private $hooks;
 
-    ////// Bootstrapping
+    ////// path mapping
 
     public static function collection(array $path)
     {
-        $config = Di::getDefault()->getShared('config');
         $client = $path[0];
         if ($client == 'Master')
         {
-            $dbname = $config->mongodb->database;
+            $dbname = 'Master';
             $collectionName = $path[1];
         }
         else
         {
             $spaceId = $path[1];
-            $collectionName = $path[2];
             $dbname = $client . '_' . $spaceId;
+            $collectionName = $path[2];
         }
-        return (new static(Di::getDefault()->getShared('mongo'), $dbname, $collectionName,['typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array']]));
+        return (new static(Di::getDefault()->getShared('mongo'), $dbname, $collectionName, ['typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array']]));
     }
 
+    public function __construct(Manager $manager, $databaseName, $collectionName, array $options)
+    {
+        $this->modelName = $collectionName;
+        $this->hooks = Di::getDefault()->getShared('hooks');
+        parent::__construct($manager, $databaseName, $collectionName, $options);
+    }
 
     ////// Basics
 
@@ -100,12 +108,10 @@ class Model extends \MongoDB\Collection
 
     public function create(array $data)
     {
-        $hooks = Di::getDefault()->getShared('hooks');
-
         $data['_id'] = (string) (new ObjectID());
-        $hooks->beforeCreate($data);
+        $this->hooks->beforeCreate($this->modelName, $data);
         $result = $this->insertOne($data);
-        $hooks->afterCreate($result);
+        $this->hooks->afterCreate($this->modelName, $data);
         return $result;
     }
 
