@@ -3,6 +3,7 @@ declare(strict_types = 1);  // MUAHAHAHAHAHAHAHHHH!!!!! finally..
 
 namespace MemMaker\MongoDB;
 
+use MemMaker\MongoDB\Exceptions\ErrorOnInsertException;
 use MongoDB\Driver\Command;
 use MongoDB\Database;
 use MongoDB\BSON\Javascript;
@@ -10,6 +11,8 @@ use MongoDB\BSON\ObjectID;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Collection;
 use MongoDB\Driver\Manager;
+use MongoDB\Driver\WriteResult;
+use MongoDB\InsertOneResult;
 use Phalcon\Di;
 use Phalcon\Text;
 
@@ -109,7 +112,7 @@ class Model extends Collection
         $continueCreation = $this->hooks->beforeCreate($this->modelName, $data);
         if (!$continueCreation)
         {
-            return false;
+            throw new ErrorOnInsertException('beforeCreate.hooks.denied');
         }
         $result = $this->insertOne($data);
         $this->hooks->afterCreate($this->modelName, $data);
