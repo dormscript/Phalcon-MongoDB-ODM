@@ -3,7 +3,6 @@ declare(strict_types = 1);  // MUAHAHAHAHAHAHAHHHH!!!!! finally..
 
 namespace MemMaker\MongoDB;
 
-use Master\TheBackend\Models\Entries;
 use MongoDB\Driver\Command;
 use MongoDB\Database;
 use MongoDB\BSON\Javascript;
@@ -11,16 +10,14 @@ use MongoDB\BSON\ObjectID;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Collection;
 use MongoDB\Driver\Manager;
-use MongoDB\Model\BSONDocument;
 use Phalcon\Di;
-use Phalcon\Mvc\CollectionInterface;
 use Phalcon\Text;
 
 // autoloading would not work for me, TODO: make it work
 require_once 'Exceptions/EntryNotFoundException.php';
 require_once 'Exceptions/ErrorOnInsertException.php';
 
-class Model extends \MongoDB\Collection
+class Model extends Collection
 {
 
     protected $_id;
@@ -109,7 +106,11 @@ class Model extends \MongoDB\Collection
     public function create(array $data)
     {
         $data['_id'] = (string) (new ObjectID());
-        $this->hooks->beforeCreate($this->modelName, $data);
+        $continueCreation = $this->hooks->beforeCreate($this->modelName, $data);
+        if (!$continueCreation)
+        {
+            return false;
+        }
         $result = $this->insertOne($data);
         $this->hooks->afterCreate($this->modelName, $data);
         return $result;
@@ -120,7 +121,7 @@ class Model extends \MongoDB\Collection
         $result = $this->findOne(['_id' => $id]);
         if ($result == null)
         {
-            throw new \MemMaker\MongoDB\Exceptions\EntryNotFoundException(vsprintf("Entry with id '%1\$s' not found in collection '%2\$s'", [$id, $collection->getCollectionName()]));
+            throw new Exceptions\EntryNotFoundException(vsprintf("Entry with id '%1\$s' not found in collection '%2\$s'", [$id, $this->getCollectionName()]));
         }
         return $result;
     }
@@ -138,18 +139,9 @@ class Model extends \MongoDB\Collection
 
     ////// Advanced
 
-    public function increment($argument, $value = 1)
+    public function incrementById($id, $fieldName, $byValue = 1)
     {
-        $this->{$argument} += $value;
-        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
-        return $this;
-    }
-
-    public function decrement($argument, $value = 1)
-    {
-        $this->{$argument} -= $value;
-        $this->updateOne(['_id' => $this->_id], ['$set' => [$argument => $this->{$argument}]]);
-        return $this;
+        return $this->updateOne(['_id' => $id], ['$inc' => [$fieldName => $byValue]]);
     }
 
     public static function mapReduce($mapJS, $reduceJS, array $query = array())
@@ -157,12 +149,12 @@ class Model extends \MongoDB\Collection
         $map = new Javascript($mapJS);
         $reduce = new Javascript($reduceJS);
 
-        $source = static::getSource();
+        $source = static::getSource();  // TODO: remove or refactor
         $command = new Command([
             "mapreduce" => $source,
             "map" => $map,
             "reduce" => $reduce,
-            "query" => new \stdClass(), //new BSONDocument($query),
+            "query" => new \stdClass(),
             "out" => 'results'
         ]);
 
