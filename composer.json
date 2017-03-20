@@ -23,6 +23,5 @@
     "psr-4": {
       "MemMaker\\MongoDB\\": "src/MongoDB"
     }
-  },
-  "minimum-stability": "alpha"
+  }
 }
