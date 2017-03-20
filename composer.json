@@ -17,7 +17,7 @@
   ],
   "require": {
     "ext-mongodb": "*",
-    "mongodb/mongodb": ">=1.1.0@alpha"
+    "mongodb/mongodb": ">=1.1.2"
   },
   "autoload": {
     "psr-4": {
